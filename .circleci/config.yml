@@ -1,31 +1,106 @@
 version: 2
 
+only-build-tag: &only-build-tags
+  filters:
+    tags:
+      only: /^build-.*/
+    branches:
+      ignore: /.*/
+
 jobs:
-  flutter-setup:
+  setup-workspace:
+    working_directory: ~/code
     docker:
       - image: cirrusci/flutter
     steps:
       - checkout
       - run:
-          name: Run Flutter doctor
-          command: flutter doctor
-      - run:
           name: Accept Android tool chain licences
           command: (yes || true) | flutter doctor --android-licenses
-  flutter-test:
+      - run:
+          name: Get Packages
+          command: flutter packages get
+      - run:
+          name: Setup environment
+          command: dart tool/setup_environment.dart
+      - persist_to_workspace:
+          root: /home/cirrus
+          paths: code
+  tests:
+    working_directory: ~/code
     docker:
       - image: cirrusci/flutter
     steps:
+      - attach_workspace:
+          at: /home/cirrus/
       - run:
-          name: Run Flutter doctor
-          command: flutter doctor
+          name: Accept Android tool chain licences
+          command: (yes || true) | flutter doctor --android-licenses
+      - run:
+          name: Get Packages
+          command: flutter packages get
+      - run:
+          name: Run tests
+          command: flutter test
+  lint:
+    working_directory: ~/code
+    docker:
+      - image: cirrusci/flutter
+    steps:
+      - attach_workspace:
+          at: /home/cirrus/
+      - run:
+          name: Accept Android tool chain licences
+          command: (yes || true) | flutter doctor --android-licenses
+      - run:
+          name: Create report directory if not exists
+          command: mkdir -p build
+      - run:
+          name: Run lints
+          command: flutter analyze --write=build/lint-result.txt
+      - store_artifacts:
+          path: ~/code/build/lint-result.txt
+          destination: lint
+  build-android-release:
+    working_directory: ~/code
+    docker:
+      - image: cirrusci/flutter
+    steps:
+      - attach_workspace:
+          at: /home/cirrus/
+      - run:
+          name: Accept Android tool chain licences
+          command: (yes || true) | flutter doctor --android-licenses
+      - run:
+          name: Get Packages
+          command: flutter packages get
+      - run:
+          name: Build Android release
+          command: flutter build apk --release
+      - store_artifacts:
+          path: ~/code/build/app/outputs/apk/release/app-release.apk
+          destination: apk
 
 workflows:
   version: 2
-  push-workflow:
+  pull-request-check:
     jobs:
-      - flutter-setup
-      - flutter-test:
+      - setup-workspace
+      - tests:
           requires:
-            - flutter-setup
+            - setup-workspace
+      - lint:
+          requires:
+            - setup-workspace
+      - build-android-release:
+          requires:
+            - lint
+            - tests
+  build-app:
+    jobs:
+      - setup-workspace: *only-build-tags
+      - build-android-release:
+          <<: *only-build-tags
+          requires:
+            - setup-workspace
 
