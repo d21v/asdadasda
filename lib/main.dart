@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '.env.dart';
+import 'configuration_keys.dart';
+
 void main() => runApp(MyApp());
 
 class MyApp extends StatelessWidget {
@@ -91,6 +94,12 @@ class _MyHomePageState extends State<MyHomePage> {
           // horizontal).
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
+            Container(
+              margin: EdgeInsets.all(20),
+              child: Text(
+                '${ConfigurationKeys.BASE_URL_KEY}: ${ENVIRONMENT[ConfigurationKeys.BASE_URL_KEY]}',
+              ),
+            ),
             Text(
               'You have pushed the button this many times:',
             ),
